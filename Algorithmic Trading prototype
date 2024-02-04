@@ -1,0 +1,59 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Generate a sample price dataset
+np.random.seed(42)
+dates = pd.date_range(start='2022-01-01', end='2022-12-31', freq='B')
+prices = np.cumsum(np.random.randn(len(dates)))
+
+df = pd.DataFrame({'Date': dates, 'Price': prices})
+df.set_index('Date', inplace=True)
+
+# Define a simple moving average strategy
+def moving_average_strategy(data, short_window, long_window):
+    signals = pd.DataFrame(index=data.index)
+    signals['signal'] = 0.0
+
+    # Create short simple moving average
+    signals['short_mavg'] = data['Price'].rolling(window=short_window, min_periods=1, center=False).mean()
+
+    # Create long simple moving average
+    signals['long_mavg'] = data['Price'].rolling(window=long_window, min_periods=1, center=False).mean()
+
+    # Create signals
+    signals['signal'][short_window:] = np.where(signals['short_mavg'][short_window:] > signals['long_mavg'][short_window:], 1.0, 0.0)
+
+    # Generate trading orders
+    signals['positions'] = signals['signal'].diff()
+
+    return signals
+
+# Define short and long windows
+short_window = 40
+long_window = 100
+
+# Get trading signals
+signals = moving_average_strategy(df, short_window, long_window)
+
+# Plot the strategy
+fig, ax = plt.subplots(figsize=(12, 8))
+
+# Plot prices
+ax.plot(df.index, df['Price'], label='Price')
+
+# Plot short and long moving averages
+ax.plot(signals.index, signals['short_mavg'], label=f'{short_window} days short MA')
+ax.plot(signals.index, signals['long_mavg'], label=f'{long_window} days long MA')
+
+# Plot buy signals
+ax.plot(signals.loc[signals.positions == 1.0].index, signals.short_mavg[signals.positions == 1.0], '^', markersize=10, color='g', label='Buy Signal')
+
+# Plot sell signals
+ax.plot(signals.loc[signals.positions == -1.0].index, signals.short_mavg[signals.positions == -1.0], 'v', markersize=10, color='r', label='Sell Signal')
+
+plt.title('Algorithmic Trading Strategy')
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.legend()
+plt.show()
